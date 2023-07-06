@@ -14,6 +14,7 @@ RIOTBASE ?= $(CURDIR)/../..
 USEPKG += nimble
 USEMODULE += nimble_svc_gap
 USEMODULE += nimble_svc_gatt
+USEMODULE += bme280_i2c
 
 # Use automated advertising
 USEMODULE += nimble_autoadv
