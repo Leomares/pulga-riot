@@ -24,9 +24,9 @@ def exitHandler():
     '''
     cursor.execute(create_table_query)
     connection.commit()
-    insert_query = 'INSERT INTO sensordata VALUES(?,?,?,?)'
+    insert_query = 'INSERT INTO sensordata VALUES(?,?,?,?,?)'
     for i in range(len(x)):
-        cursor.execute(insert_query, (x[i], y[i], z[i], t[i]))
+        cursor.execute(insert_query, (i, x[i], y[i], z[i], t[i]))
     connection.commit()
     connection.close()
 
