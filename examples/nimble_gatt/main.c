@@ -56,14 +56,10 @@
 #include "timex.h"
 /* Macros for frames to be read */
 
-#define ACC_FRAMES 10 /* 10 Frames are available every 100ms @ 100Hz */ // Datasheet says you can take measurementes at 1600 Hz
-/* 10 frames containing a 1 byte header, 6 bytes of accelerometer,
- * 6 bytes of gyroscope and 8 bytes of magnetometer data. This results in
- * 21 bytes per frame. Additional 40 bytes in case sensor time readout is enabled */
-#define FIFO_SIZE 250
-
-#define TAMANHO_MEDIDA (3 * sizeof(int16_t) + sizeof(int))
-#define CONTADOR 15 // QUANTIDADE DE MEDIDAS DO DUMP
+#define ACC_FRAMES 40 /* 40 Frames are available every 25ms @ 1600 Hz */
+/* 40 frames containing a 1 byte header, 6 bytes of accelerometer,
+ * This results in 7 bytes per frame*/
+#define FIFO_SIZE 280
 
 /* Variable declarations */
 struct bmi160_dev bmi;
@@ -87,25 +83,16 @@ typedef struct
     int16_t X_axis;
     int16_t Y_axis;
     int16_t Z_axis;
-    int timestamp;
 } leitura;
 
-#define MAX_READINGS 11000
+#define MAX_READINGS 1600
 
 leitura readings_buffer[MAX_READINGS];
-size_t rlen = 0;
-
-int dump_index = 0;
+int write_index;
 
 void init_bmiSensor(void);
 void direct_read(void);
-void do_read(void);
-void log_readings(void);
 void acquire_ACC_Values(void);
-
-uint16_t latest_measurement = 0; // Ring buffer index
-uint16_t get_ring_index(void);
-void add_ring_index(void);
 
 int dev = I2C_DEV(0);
 
@@ -128,7 +115,7 @@ void user_delay(uint32_t period)
 
 /* accel params and conversion constants */
 // #define AC 2048.0 // for 16G
-#define AC 8192.0 // for 16G
+#define AC 8192.0 // for 4G
 // #define AC 16384.0 // for 2G
 /* gyro params and conversion constants */
 #define GC 16.4 // for 2000 DPS
@@ -148,9 +135,11 @@ int main(void)
 
     (void)puts("Welcome to RIOT!");
 
+    puts("+------------Initializing------------+");
+    
     init_bmiSensor();
 
-    puts("+------------Initializing------------+");
+    /*
     switch (bmx280_init(&devbme, &bmx280_params[0]))
     {
     case BMX280_ERR_BUS:
@@ -160,64 +149,26 @@ int main(void)
         puts("[Error] Unable to communicate with any BMX280 device");
         return 1;
     default:
-        /* all good -> do nothing */
+         // all good -> do nothing
         break;
-    }
+    } */
 
     while (1)
     {
+        write_index = 0;
+        rslt = bmi160_set_fifo_flush(&bmi);
+        if (rslt != BMI160_OK)
+        {
+            printf("Error flushing BMI160 FIFO - %d\n \r", rslt);
+            return 0;
+        }
         t1 = xtimer_now_usec();
         acquire_ACC_Values();
         direct_read();
         t2 = xtimer_now_usec();
         printf("time: %d \n", (int)(t2 - t1) / 1000);
-        // do_read(); // aqui iremos adicionar os dados no final do ring buffer e incrementalo
-        // log_readings();
     }
     return 0;
-}
-
-void direct_read(void)
-{
-    for (int i = 0; i < ACC_FRAMES; i++)
-    {
-        printf("%2.6f ", ((float)accel_data[i].x) / AC);
-        printf("%2.6f ", ((float)accel_data[i].y) / AC);
-        printf("%2.6f ", ((float)accel_data[i].z) / AC);
-        printf("%2.2f ", bmx280_read_temperature(&devbme) / 100.0);
-        printf("%d ", (int)(xtimer_now_usec() / 1000));
-        printf("\n");
-    }
-}
-
-void do_read(void)
-{
-    uint16_t aux = get_ring_index(); // supoes-se que o index nunca vai ser um valor proibido nunca <0 e nem >= MAX READINGS
-    uint16_t i, j;
-    for (i = aux, j = 0; i < (aux + ACC_FRAMES) && j < ACC_FRAMES; i++, j++)
-    {
-        readings_buffer[i].X_axis = accel_data[j].x;
-        readings_buffer[i].Y_axis = accel_data[j].y;
-        readings_buffer[i].Z_axis = accel_data[j].z;
-        readings_buffer[i].timestamp = (int)(xtimer_now_usec() / 1000);
-        add_ring_index(); // incrementa-se o indice do ring buffer a cada medida
-    }
-}
-
-void log_readings(void)
-{
-    int i = get_ring_index() - 1;
-    // printf("[Acc_readings] readings_buffer[%d]: ", i);
-    // printf("Acc_x: %2.6f ", ((float)readings_buffer[i].X_axis) / AC);
-    printf("%2.6f ", ((float)readings_buffer[i].X_axis) / AC);
-    // printf("Acc_y: %2.6f ", ((float)readings_buffer[i].Y_axis) / AC);
-    printf("%2.6f ", ((float)readings_buffer[i].Y_axis) / AC);
-    // printf("Acc_z: %2.6f ", ((float)readings_buffer[i].Z_axis) / AC);
-    printf("%2.6f ", ((float)readings_buffer[i].Z_axis) / AC);
-    // printf("Acc_timeStamp: %d ", (readings_buffer[i].timestamp));
-    printf("%d ", (readings_buffer[i].timestamp));
-    // printf("\n \r");
-    printf("\n");
 }
 
 void init_bmiSensor(void)
@@ -288,7 +239,7 @@ void init_bmiSensor(void)
         return;
     }
 
-    uint8_t fifo_config = BMI160_FIFO_HEADER | BMI160_FIFO_ACCEL | BMI160_FIFO_GYRO;
+    uint8_t fifo_config = BMI160_FIFO_HEADER | BMI160_FIFO_ACCEL;
     rslt = bmi160_set_fifo_config(fifo_config, BMI160_ENABLE, &bmi);
     if (rslt != BMI160_OK)
     {
@@ -301,54 +252,46 @@ void init_bmiSensor(void)
 
 void acquire_ACC_Values(void)
 {
+    while(write_index < MAX_READINGS){
+        /* It is VERY important to reload the length of the FIFO memory as after the
+         * call to bmi160_get_fifo_data(), the bmi.fifo->length contains the
+         * number of bytes read from the FIFO */
+        bmi.fifo->length = FIFO_SIZE;
+        i2c_acquire(dev);
+        rslt = bmi160_get_fifo_data(&bmi);
+        if (rslt != BMI160_OK)
+        {
+            printf("Error getting fifo data - %d\n \r", rslt);
+            return;
+        }
+        i2c_release(dev);
 
-    /* It is VERY important to reload the length of the FIFO memory as after the
-     * call to bmi160_get_fifo_data(), the bmi.fifo->length contains the
-     * number of bytes read from the FIFO */
-    bmi.fifo->length = FIFO_SIZE;
-    i2c_acquire(dev);
-    rslt = bmi160_get_fifo_data(&bmi);
-    if (rslt != BMI160_OK)
-    {
-        printf("Error getting fifo data - %d\n \r", rslt);
-        return;
-    }
-    i2c_release(dev);
+        uint8_t acc_inst = ACC_FRAMES;
 
-    uint8_t acc_inst = ACC_FRAMES;
-
-    rslt = bmi160_extract_accel(accel_data, &acc_inst, &bmi);
-    if (rslt != BMI160_OK)
-    {
-        printf("Error extracting accel data - %d\n \r", rslt);
-        return;
+        rslt = bmi160_extract_accel(accel_data, &acc_inst, &bmi);
+        if (rslt != BMI160_OK)
+        {
+            printf("Error extracting accel data - %d\n \r", rslt);
+            return;
+        }
+        
+        for (int j = 0; j < acc_inst && write_index < MAX_READINGS; j++)
+        {
+            readings_buffer[write_index].X_axis = accel_data[j].x;
+            readings_buffer[write_index].Y_axis = accel_data[j].y;
+            readings_buffer[write_index].Z_axis = accel_data[j].z;
+            write_index++; // incrementa-se o indice do buffer a cada medida
+        
+        }
     }
 }
 
-uint16_t get_ring_index(void)
+void direct_read(void)
 {
-    return latest_measurement;
-}
-
-void add_ring_index(void)
-{
-    // latest_measurement = rlen < MAX_READINGS ? rlen++ : 0;
-    if (rlen < MAX_READINGS - 1)
+    for (int i = 0; i < MAX_READINGS; i++)
     {
-        rlen++;
-        latest_measurement = rlen;
-    }
-    else if (rlen == MAX_READINGS - 1)
-    {
-        latest_measurement = 0;
-        rlen++;
-    }
-    else if (latest_measurement == MAX_READINGS - 1)
-    {
-        latest_measurement = 0;
-    }
-    else
-    {
-        latest_measurement++;
+        printf("%2.6f %2.6f %2.6f \n", ((float)readings_buffer[write_index].X_axis) / AC
+                                     , ((float)readings_buffer[write_index].Y_axis) / AC
+                                     , ((float)readings_buffer[write_index].Z_axis) / AC);
     }
 }
