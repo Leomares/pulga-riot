@@ -110,10 +110,11 @@ int8_t user_i2c_write(uint8_t dev_addr, uint8_t reg_addr, uint8_t *data, uint16_
 }
 
 int8_t bmm150_aux_read(uint8_t reg_addr, uint8_t *reg_data, uint32_t length, void *intf_ptr) {
+    (void)intf_ptr; // unused
     
     i2c_acquire(dev);
     
-    int8_t rslt = bmi160_aux_read(reg_addr, reg_data, length, intf_ptr); //&bmi);
+    int8_t rslt = bmi160_aux_read(reg_addr, reg_data, length, &bmi);
     
     i2c_release(dev);
     
@@ -121,10 +122,13 @@ int8_t bmm150_aux_read(uint8_t reg_addr, uint8_t *reg_data, uint32_t length, voi
 }
 
 int8_t bmm150_aux_write(uint8_t reg_addr, const uint8_t *reg_data, uint32_t length, void *intf_ptr){
+    (void)intf_ptr; // unused
     
     i2c_acquire(dev);
     
-    int8_t rslt = bmi160_aux_write(reg_addr, reg_data, length, intf_ptr); //&bmi);
+    uint8_t* REG_data = (uint8_t*)reg_data;
+    
+    int8_t rslt = bmi160_aux_write(reg_addr, REG_data, length, &bmi);
     
     i2c_release(dev);
     
