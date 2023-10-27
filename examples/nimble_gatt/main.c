@@ -56,10 +56,10 @@
 #include "timex.h"
 /* Macros for frames to be read */
 
-#define ACC_FRAMES 40 /* 40 Frames are available every 25ms @ 1600 Hz */
+#define ACC_FRAMES 5 /* 40 Frames are available every 25ms @ 1600 Hz */
 /* 40 frames containing a 1 byte header, 6 bytes of accelerometer,
  * This results in 7 bytes per frame*/
-#define FIFO_SIZE 280
+#define FIFO_SIZE 35
 
 /* Variable declarations */
 struct bmi160_dev bmi;
@@ -85,7 +85,7 @@ typedef struct
     int16_t Z_axis;
 } leitura;
 
-#define MAX_READINGS 1600
+#define MAX_READINGS 100
 
 leitura readings_buffer[MAX_READINGS];
 int write_index;
@@ -132,13 +132,13 @@ bmx280_t devbme;
 
 int main(void)
 {
-
+    ztimer_sleep(ZTIMER_MSEC, 1000);
     (void)puts("Welcome to RIOT!");
 
     puts("+------------Initializing------------+");
     
     init_bmiSensor();
-
+    ztimer_sleep(ZTIMER_MSEC, 500);
     /*
     switch (bmx280_init(&devbme, &bmx280_params[0]))
     {
@@ -156,17 +156,18 @@ int main(void)
     while (1)
     {
         write_index = 0;
-        rslt = bmi160_set_fifo_flush(&bmi);
-        if (rslt != BMI160_OK)
-        {
-            printf("Error flushing BMI160 FIFO - %d\n \r", rslt);
-            return 0;
-        }
-        t1 = xtimer_now_usec();
+        //rslt = bmi160_set_fifo_flush(&bmi);
+        //if (rslt != BMI160_OK)
+        //{
+            //printf("Error flushing BMI160 FIFO - %d\n \r", rslt);
+            //return 0;
+        //}
+        //printf("flush ok");
+        //t1 = xtimer_now_usec();
         acquire_ACC_Values();
+        //t2 = xtimer_now_usec();
+        //printf("time: %d \n", (int)(t2 - t1) / 1000);
         direct_read();
-        t2 = xtimer_now_usec();
-        printf("time: %d \n", (int)(t2 - t1) / 1000);
     }
     return 0;
 }
@@ -205,7 +206,7 @@ void init_bmiSensor(void)
     bmi.accel_cfg.odr = BMI160_ACCEL_ODR_1600HZ;
     bmi.accel_cfg.range = BMI160_ACCEL_RANGE_4G;
     // bmi.accel_cfg.range = BMI160_ACCEL_RANGE_2G;
-    bmi.accel_cfg.bw = BMI160_ACCEL_BW_NORMAL_AVG4;
+    //bmi.accel_cfg.bw = BMI160_ACCEL_BW_NORMAL_AVG4;
 
     /* Select the power mode of accelerometer sensor */
     bmi.accel_cfg.power = BMI160_ACCEL_NORMAL_MODE;
@@ -226,7 +227,9 @@ void init_bmiSensor(void)
         printf("Error configuring BMI160 - %d\n \r", rslt);
         return;
     }
-
+    
+    printf("config \n \r");
+    
     /* Link the FIFO memory location */
     fifo_frame.data = fifo_buff;
     fifo_frame.length = FIFO_SIZE;
@@ -238,7 +241,7 @@ void init_bmiSensor(void)
         printf("Error clearing fifo - %d\n \r", rslt);
         return;
     }
-
+    printf("clear \n \r");
     uint8_t fifo_config = BMI160_FIFO_HEADER | BMI160_FIFO_ACCEL;
     rslt = bmi160_set_fifo_config(fifo_config, BMI160_ENABLE, &bmi);
     if (rslt != BMI160_OK)
@@ -246,6 +249,7 @@ void init_bmiSensor(void)
         printf("Error enabling fifo - %d\n \r", rslt);
         return;
     }
+    printf("enable \n \r");
     /* Check rslt for any error codes */
     i2c_release(dev);
 }
@@ -253,6 +257,7 @@ void init_bmiSensor(void)
 void acquire_ACC_Values(void)
 {
     while(write_index < MAX_READINGS){
+        //ztimer_sleep(ZTIMER_USEC, 3125);
         /* It is VERY important to reload the length of the FIFO memory as after the
          * call to bmi160_get_fifo_data(), the bmi.fifo->length contains the
          * number of bytes read from the FIFO */
@@ -267,7 +272,6 @@ void acquire_ACC_Values(void)
         i2c_release(dev);
 
         uint8_t acc_inst = ACC_FRAMES;
-
         rslt = bmi160_extract_accel(accel_data, &acc_inst, &bmi);
         if (rslt != BMI160_OK)
         {
@@ -275,13 +279,13 @@ void acquire_ACC_Values(void)
             return;
         }
         
+        
         for (int j = 0; j < acc_inst && write_index < MAX_READINGS; j++)
         {
             readings_buffer[write_index].X_axis = accel_data[j].x;
             readings_buffer[write_index].Y_axis = accel_data[j].y;
             readings_buffer[write_index].Z_axis = accel_data[j].z;
             write_index++; // incrementa-se o indice do buffer a cada medida
-        
         }
     }
 }
@@ -290,8 +294,8 @@ void direct_read(void)
 {
     for (int i = 0; i < MAX_READINGS; i++)
     {
-        printf("%2.6f %2.6f %2.6f \n", ((float)readings_buffer[write_index].X_axis) / AC
-                                     , ((float)readings_buffer[write_index].Y_axis) / AC
-                                     , ((float)readings_buffer[write_index].Z_axis) / AC);
+        printf("%2.6f %2.6f %2.6f \n", ((float)readings_buffer[i].X_axis) / AC
+                                     , ((float)readings_buffer[i].Y_axis) / AC
+                                     , ((float)readings_buffer[i].Z_axis) / AC);
     }
 }
