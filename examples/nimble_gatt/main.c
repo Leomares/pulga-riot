@@ -49,8 +49,8 @@
 #include "bmi160.h"
 #define BMM150_USE_FLOATING_POINT 
 #include "bmm150.h"
-#include "bmx280_params.h"
-#include "bmx280.h"
+//#include "bmx280_params.h"
+//#include "bmx280.h"
 
 #include <stdint.h>
 #include "event/timeout.h"
@@ -67,8 +67,6 @@
 /* Variable declarations */
 struct bmi160_dev bmi;
 struct bmm150_dev bmm;
-
-struct bmm150_settings bmm_settings;
 
 uint8_t fifo_buff[FIFO_SIZE];
 struct bmi160_fifo_frame fifo_frame;
@@ -109,26 +107,26 @@ int8_t user_i2c_write(uint8_t dev_addr, uint8_t reg_addr, uint8_t *data, uint16_
     return i2c_write_regs(dev, dev_addr, reg_addr, data, len, 0);
 }
 
-int8_t bmm150_aux_read(uint8_t reg_addr, uint8_t *reg_data, uint32_t length, void *intf_ptr) {
-    (void)intf_ptr; // unused
+int8_t bmm150_aux_read(uint8_t id, uint8_t reg_addr, uint8_t *reg_data, uint16_t len)
+{
+    (void) id; /* id is unused here */    
     
     i2c_acquire(dev);
     
-    int8_t rslt = bmi160_aux_read(reg_addr, reg_data, length, &bmi);
+    int8_t rslt = bmi160_aux_read(reg_addr, reg_data, len, &bmi);
     
     i2c_release(dev);
     
     return rslt;
 }
 
-int8_t bmm150_aux_write(uint8_t reg_addr, const uint8_t *reg_data, uint32_t length, void *intf_ptr){
-    (void)intf_ptr; // unused
+int8_t bmm150_aux_write(uint8_t id, uint8_t reg_addr, uint8_t *reg_data, uint16_t len)
+{
+    (void) id; /* id is unused here */ 
     
     i2c_acquire(dev);
     
-    uint8_t* REG_data = (uint8_t*)reg_data;
-    
-    int8_t rslt = bmi160_aux_write(reg_addr, REG_data, length, &bmi);
+    int8_t rslt = bmi160_aux_write(reg_addr, reg_data, len, &bmi);
     
     i2c_release(dev);
     
@@ -140,13 +138,6 @@ void user_delay(uint32_t period)
     ztimer_sleep(ZTIMER_MSEC, period);
 }
 
-void user_delay_us(uint32_t period, void *intf_ptr)
-{
-    (void) intf_ptr;
-    
-    ztimer_sleep(ZTIMER_USEC, period);
-}
-
 // #define GATT_DEVICE_INFO_UUID                   0x180A
 // #define GATT_MANUFACTURER_NAME_UUID             0x2A29
 // #define GATT_MODEL_NUMBER_UUID                  0x2A24
@@ -154,7 +145,7 @@ void user_delay_us(uint32_t period, void *intf_ptr)
 #define STR_ANSWER_BUFFER_SIZE 4096
 
 uint32_t t1, t2;
-bmx280_t devbme;
+//bmx280_t devbme;
 
 int main(void)
 {
@@ -200,12 +191,11 @@ void init_bmi_bmm_Sensors(void)
     
     /* The BMM150 API tunnels through the auxiliary interface of the BMI160 */
     /* Check the pins of the BMM150 for the right I2C address */
-    // bmm.dev_id = BMM150_DEFAULT_I2C_ADDRESS;
+    bmm.dev_id = BMM150_DEFAULT_I2C_ADDRESS;
     bmm.intf = BMM150_I2C_INTF;
     bmm.read = bmm150_aux_read;
     bmm.write = bmm150_aux_write;
-    bmm.delay_us = user_delay_us;
-    bmm.intf_ptr = &bmi;
+    bmm.delay_ms = user_delay;
 
     rslt = bmi160_init(&bmi);
     if (rslt == BMI160_OK)
@@ -222,10 +212,10 @@ void init_bmi_bmm_Sensors(void)
         printf("Error initializing BMI160 - %d\n \r", rslt);
         return;
     }
-    
+
     /* Configure the BMI160's auxiliary interface for the BMM150 */
     bmi.aux_cfg.aux_sensor_enable = BMI160_ENABLE;
-    bmi.aux_cfg.aux_i2c_addr = BMI160_AUX_BMM150_I2C_ADDR; //bmm.dev_id;
+    bmi.aux_cfg.aux_i2c_addr = bmm.dev_id;
     bmi.aux_cfg.manual_enable = BMI160_ENABLE; /* Manual mode */
     bmi.aux_cfg.aux_rd_burst_len = BMI160_AUX_READ_LEN_3; /* 8 bytes */
     
@@ -241,7 +231,7 @@ void init_bmi_bmm_Sensors(void)
     }
     
     rslt = bmm150_init(&bmm);
-    if (rslt == BMI160_OK)
+    if (rslt == BMM150_OK)
     {
         printf("Success initializing BMM150");
     }
@@ -267,8 +257,8 @@ void init_bmi_bmm_Sensors(void)
     
     
     /* Configure the magnetometer. The low power preset supports >300Hz in Forced mode */
-    bmm_settings.preset_mode= BMM150_PRESETMODE_LOWPOWER;
-    rslt = bmm150_set_presetmode(&bmm_settings, &bmm);
+    bmm.settings.preset_mode= BMM150_PRESETMODE_LOWPOWER;
+    rslt = bmm150_set_presetmode(&bmm);
     if (rslt != BMM150_OK)
     {
         printf("Error configuring BMM150 preset mode - %d\n \r", rslt);
@@ -278,16 +268,16 @@ void init_bmi_bmm_Sensors(void)
     /* It is important that the last write to the BMM150 sets the forced mode.
      * This is because the BMI160 writes the last value to the auxiliary sensor 
      * after every read */
-    bmm_settings.pwr_mode = BMM150_POWERMODE_FORCED;
-    rslt = bmm150_set_op_mode(&bmm_settings, &bmm);
+    bmm.settings.pwr_mode = BMM150_FORCED_MODE;
+    rslt = bmm150_set_op_mode(&bmm);
     if (rslt != BMM150_OK)
     {
         printf("Error configuring BMM150 power mode - %d\n \r", rslt);
         return;
     }
     
-    uint8_t bmm150_data_start = BMM150_REG_DATA_X_LSB;
-    bmi.aux_cfg.aux_odr = BMI160_AUX_ODR_200HZ;
+    uint8_t bmm150_data_start = BMM150_DATA_X_LSB;
+    bmi.aux_cfg.aux_odr = BMI160_AUX_ODR_100HZ;
     rslt = bmi160_set_aux_auto_mode(&bmm150_data_start, &bmi);
     if (rslt != BMI160_OK)
     {
@@ -391,7 +381,7 @@ void acquire_read(void)
     }
         
     for (uint8_t i = 0; i < aux_inst; i++) {
-        rslt = bmm150_aux_mag_data(&aux_data[0].data[0], &mag_data[i], &bmm);
+        rslt = bmm150_aux_mag_data(&aux_data[i].data[0], &bmm);
         if (rslt != BMI160_OK)
         {
             printf("Error compensating magnetometer data - %d\n \r", rslt);
@@ -400,7 +390,8 @@ void acquire_read(void)
             
         //mag_data[i] = bmm.data;
             
-        printf("%2.6f %2.6f %2.6f \n", mag_data[i].x, mag_data[i].y, mag_data[i].z);
+        //printf("%2.6f %2.6f %2.6f \n", mag_data[i].x, mag_data[i].y, mag_data[i].z);
+        printf("%2.6f %2.6f %2.6f \n", bmm.data.x, bmm.data.y, bmm.data.z);
     }
         
 }
