@@ -41,9 +41,9 @@ count = 0
 
 fig, axs = plt.subplots(3, 1, figsize=(12, 6))
 legends = ["x", "y", "z"]
-ylabel = [a + '"(g)' for a in legends[:-1]]
+ylabel = [a + '"(g)' for a in legends]
 
-port = serial.Serial("COM3", 115200) # windows
+port = serial.Serial("COM4", 115200) # windows
 #port = serial.Serial("/dev/ttyUSB0", 115200) # linux
 
 while 1:
@@ -79,9 +79,8 @@ while 1:
             axs[0].set_ylim([-1.5, 1.5])
             axs[1].set_ylim([-1.5, 1.5])
             axs[2].set_ylim([-1.5, 1.5])
-            axs[3].set_ylim([20, 30])
-            for ax in axs:
-                axs[i].set_ylabel(ylabel[i])
+            for j in range(3):
+                axs[j].set_ylabel(ylabel[j])
                 ax.legend(loc="upper right")
             plt.pause(0.1)
             plt.show(block=False)
