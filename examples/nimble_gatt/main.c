@@ -56,10 +56,10 @@
 #include "timex.h"
 /* Macros for frames to be read */
 
-#define ACC_FRAMES 5 /* 40 Frames are available every 25ms @ 1600 Hz */
+#define ACC_FRAMES 30 /* 40 Frames are available every 25ms @ 1600 Hz */
 /* 40 frames containing a 1 byte header, 6 bytes of accelerometer,
  * This results in 7 bytes per frame*/
-#define FIFO_SIZE 35
+#define FIFO_SIZE 210
 
 /* Variable declarations */
 struct bmi160_dev bmi;
@@ -85,7 +85,7 @@ typedef struct
     int16_t Z_axis;
 } leitura;
 
-#define MAX_READINGS 100
+#define MAX_READINGS 1600
 
 leitura readings_buffer[MAX_READINGS];
 int write_index;
@@ -118,7 +118,7 @@ void user_delay(uint32_t period)
 #define AC 8192.0 // for 4G
 // #define AC 16384.0 // for 2G
 /* gyro params and conversion constants */
-#define GC 16.4 // for 2000 DPS
+//#define GC 16.4 // for 2000 DPS
 // #define GC 131.2 // for 250 DPS
 
 // #define GATT_DEVICE_INFO_UUID                   0x180A
@@ -163,10 +163,10 @@ int main(void)
             //return 0;
         //}
         //printf("flush ok");
-        //t1 = xtimer_now_usec();
+        t1 = xtimer_now_usec();
         acquire_ACC_Values();
-        //t2 = xtimer_now_usec();
-        //printf("time: %d \n", (int)(t2 - t1) / 1000);
+        t2 = xtimer_now_usec();
+        printf("time: %d \n", (int)(t2 - t1) / 1000);
         direct_read();
     }
     return 0;
