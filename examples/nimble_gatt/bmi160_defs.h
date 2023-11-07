@@ -581,7 +581,7 @@
 #define BMI160_I2C_ADDR                           UINT8_C(0x69)
 
 /* BMI160 secondary IF address */
-#define BMI160_AUX_BMM150_I2C_ADDR                UINT8_C(0x10)
+//#define BMI160_AUX_BMM150_I2C_ADDR                UINT8_C(0x10)
 
 /** BMI160 Length definitions */
 #define BMI160_ONE                                UINT8_C(1)

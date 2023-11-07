@@ -47,7 +47,7 @@
 #include "periph/i2c.h"
 
 #include "bmi160.h"
-#define BMM150_USE_FLOATING_POINT 
+//#define BMM150_USE_FLOATING_POINT 
 #include "bmm150.h"
 //#include "bmx280_params.h"
 //#include "bmx280.h"
@@ -59,10 +59,10 @@
 
 /* Macros for frames to be read */
 
-#define MAG_FRAMES 10 /* 10 Frames are available every 25ms @ 400 Hz */
+#define MAG_FRAMES 1 /* 10 Frames are available every 25ms @ 400 Hz */
 /* 10 frames containing a 1 byte header and 8 bytes of magnetometer data,
  * This results in 9 bytes per frame*/
-#define FIFO_SIZE 90
+#define FIFO_SIZE 9
 
 /* Variable declarations */
 struct bmi160_dev bmi;
@@ -77,9 +77,12 @@ int8_t rslt;
 
 typedef struct
 {
-    float X_axis;
-    float Y_axis;
-    float Z_axis;
+    //float X_axis;
+    //float Y_axis;
+    //float Z_axis;
+    int16_t Y_axis;
+    int16_t X_axis;
+    int16_t Z_axis;
 } leitura;
 
 #define MAX_READINGS 200
@@ -109,13 +112,9 @@ int8_t user_i2c_write(uint8_t dev_addr, uint8_t reg_addr, uint8_t *data, uint16_
 
 int8_t bmm150_aux_read(uint8_t id, uint8_t reg_addr, uint8_t *reg_data, uint16_t len)
 {
-    (void) id; /* id is unused here */    
-    
-    i2c_acquire(dev);
+    (void) id; /* id is unused here */
     
     int8_t rslt = bmi160_aux_read(reg_addr, reg_data, len, &bmi);
-    
-    i2c_release(dev);
     
     return rslt;
 }
@@ -124,11 +123,7 @@ int8_t bmm150_aux_write(uint8_t id, uint8_t reg_addr, uint8_t *reg_data, uint16_
 {
     (void) id; /* id is unused here */ 
     
-    i2c_acquire(dev);
-    
     int8_t rslt = bmi160_aux_write(reg_addr, reg_data, len, &bmi);
-    
-    i2c_release(dev);
     
     return rslt;
 }
@@ -145,6 +140,7 @@ void user_delay(uint32_t period)
 #define STR_ANSWER_BUFFER_SIZE 4096
 
 uint32_t t1, t2;
+uint32_t a;
 //bmx280_t devbme;
 
 int main(void)
@@ -155,7 +151,9 @@ int main(void)
     puts("+------------Initializing------------+");
     
     init_bmi_bmm_Sensors();
-
+    
+    //ztimer_sleep(ZTIMER_MSEC, 1000);
+    
     while (1)
     {
         //write_index = 0;
@@ -170,7 +168,14 @@ int main(void)
         //direct_read();
         //t2 = xtimer_now_usec();
         //printf("time: %d \n", (int)(t2 - t1) / 1000);
+        ztimer_sleep(ZTIMER_MSEC, 4);
         acquire_read();
+        //t1 = xtimer_now_usec() + 10000;
+        //t2 = 0;
+        //while(t2 < t1){ 
+            //t2 = xtimer_now_usec();
+            //}
+        //ztimer_sleep(ZTIMER_MSEC, 5);
     }
     return 0;
 }
@@ -244,6 +249,14 @@ void init_bmi_bmm_Sensors(void)
     /* Select the power mode of accelerometer sensor */
     bmi.accel_cfg.power = BMI160_ACCEL_SUSPEND_MODE;
 
+    //bmi.accel_cfg.odr = BMI160_ACCEL_ODR_200HZ;
+    //bmi.accel_cfg.range = BMI160_ACCEL_RANGE_4G;
+    // bmi.accel_cfg.range = BMI160_ACCEL_RANGE_2G;
+    //bmi.accel_cfg.bw = BMI160_ACCEL_BW_NORMAL_AVG4;
+
+    /* Select the power mode of accelerometer sensor */
+    //bmi.accel_cfg.power = BMI160_ACCEL_NORMAL_MODE;
+
     /* Select the power mode of Gyroscope sensor */
     bmi.gyro_cfg.power = BMI160_GYRO_SUSPEND_MODE;
     
@@ -277,7 +290,7 @@ void init_bmi_bmm_Sensors(void)
     }
     
     uint8_t bmm150_data_start = BMM150_DATA_X_LSB;
-    bmi.aux_cfg.aux_odr = BMI160_AUX_ODR_100HZ;
+    bmi.aux_cfg.aux_odr = BMI160_AUX_ODR_200HZ;
     rslt = bmi160_set_aux_auto_mode(&bmm150_data_start, &bmi);
     if (rslt != BMI160_OK)
     {
@@ -366,6 +379,7 @@ void acquire_read(void)
     rslt = bmi160_get_fifo_data(&bmi);
     if (rslt != BMI160_OK)
     {
+        printf("length - %d \n \r", bmi.fifo->length);
         printf("Error getting fifo data - %d\n \r", rslt);
         return;
     }
@@ -388,10 +402,11 @@ void acquire_read(void)
             return;
         }
             
-        //mag_data[i] = bmm.data;
+        mag_data[i] = bmm.data;
             
         //printf("%2.6f %2.6f %2.6f \n", mag_data[i].x, mag_data[i].y, mag_data[i].z);
-        printf("%2.6f %2.6f %2.6f \n", bmm.data.x, bmm.data.y, bmm.data.z);
+        //printf("%2.6f %2.6f %2.6f \n", 1000*bmm.data.x, 1000*bmm.data.y, 1000*bmm.data.z);
+        printf("%d %d %d \n \r", bmm.data.x, bmm.data.y, bmm.data.z);
     }
         
 }

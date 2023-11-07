@@ -161,9 +161,6 @@ un-comment it to obtain the output data in float */
 
 /**\name I2C ADDRESS       */
 #define BMM150_DEFAULT_I2C_ADDRESS		UINT8_C(0x10)
-#define BMM150_I2C_ADDRESS_CSB_LOW_SDO_HIGH	UINT8_C(0x11)
-#define BMM150_I2C_ADDRESS_CSB_HIGH_SDO_LOW	UINT8_C(0x12)
-#define BMM150_I2C_ADDRESS_CSB_HIGH_SDO_HIGH	UINT8_C(0x13)
 
 /**\name Power mode settings  */
 #define	BMM150_POWER_CNTRL_DISABLE	UINT8_C(0x00)
