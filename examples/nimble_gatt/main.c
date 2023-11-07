@@ -168,7 +168,7 @@ int main(void)
         //direct_read();
         //t2 = xtimer_now_usec();
         //printf("time: %d \n", (int)(t2 - t1) / 1000);
-        ztimer_sleep(ZTIMER_MSEC, 4);
+        for(int j = 0; j < 3; j++){ztimer_sleep(ZTIMER_MSEC, 1);}
         acquire_read();
         //t1 = xtimer_now_usec() + 10000;
         //t2 = 0;
