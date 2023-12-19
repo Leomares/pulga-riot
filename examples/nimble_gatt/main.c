@@ -118,19 +118,30 @@ void Pulga_LSTM(float X[], int input_size, float output[]){
     }
 }
 
+uint32_t t1, t2;
+float X[1600];
+float output[LSTM_units];
+
 int main(void)
 {
 
     (void)puts("Welcome to RIOT!");
     
-    float X[5] = {1.0,1.0,1.0,1.0,1.0};
-    float output[LSTM_units];
+    for(int i = 0; i < 1600; i++){
+        X[i] = 1.0;
+    }
+    
+    t1 = xtimer_now_usec();
+    
+    Pulga_LSTM(X, 1600, output);
 
-    Pulga_LSTM(X, 5, output);
+    t2 = xtimer_now_usec();
 
     for(int i = 0; i < LSTM_units; i++){
         printf("\n \r %f", output[i]);
     }
+    
+    printf("\n \r time: %f seconds", (float)(t2 - t1) / 1000000);
     
     printf("\n \r \n \r \n \r");
     
